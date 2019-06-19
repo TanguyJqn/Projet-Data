@@ -4,42 +4,48 @@ Created on Tue Jun  4 15:50:12 2019
 
 @author: Tanguy Jennequin
 """
-
-import numpy as np
 import pandas as pd
+import numpy as np
 
-def percep(data,limite = 4000,learning_rate = 0.01):
-    
-    train = entrainement(data)
-    data_train = train.iloc[:,:11]
-    data_train_quality = train.iloc[:,11:]
-    
-    evalue = test(data)
-    data_test = evalue.iloc[:,:11]
-    data_test_quality = evalue.iloc[:,11:]
 
-    data_train_np = np.array(data_train)
-    data_test_np = np.array(data_test)
-    data_train_quality_np = np.array(data_train_quality)
+def test_perceptron(data,limite = 4000,learning_rate = 0.01):
+    
+    train = entrainement(data)   # recupération de 90% des valeurs pour les données d'entrainement
+    
+    d_train = train.iloc[:,:11]         # on tronque les données en 2 -> le dataframe entier sans la qualité
+    d_quality_train = train.iloc[:,11:]     # seulement la qualité ici
+    
+    d_numpy_train = np.array(d_train)               # conversion des données en tableau numpy pour pouvoir les traiter dans le perceptron
+    d_numpy_quality_train = np.array(d_quality_train)
+    
+    
+    
+    evaluate = test(data)       # recupération de 10% des valeurs pour les données de test
+    
+    data_test = evaluate.iloc[:,:11]         # on tronque les données en 2 -> le dataframe entier sans la qualité
+    data_test_quality = evaluate.iloc[:,11:]  # seulement la qualité ici
+    
+    data_test_np = np.array(data_test)           # conversion des données en tableau numpy pour pouvoir les traiter dans le perceptron
     data_test_quality_np = np.array(data_test_quality)
 
-    p = Perceptron(11,limite,learning_rate)
-    p.train(data_train_np,data_train_quality_np)
-    score = p.score_perceptron(data_test_np,data_test_quality_np)
 
-    return score     
+    percep = Perceptron(11,limite,learning_rate)  # on initialise le perceptron avec les paramètres de colonne, de seuil et de taux d'apprentissage
+    percep.train(d_numpy_train,d_numpy_quality_train)    #apprentissage avec données d'entrainement
+    accurancy = percep.perceptron_accurancy(data_test_np,data_test_quality_np) #appel de la fonction accurancy pour avoir le % de bonne prédiction ( avec les données de test cette fois) 
+
+    return accurancy     
 
 
-class Perceptron(object):
+class Perceptron(object): # création d'une classe perceptron et ses attributs : nb d'entrées, seuil et taux d'apprentissage
 
     def __init__(self, nb_inputs, seuil=4000, learning_rate=0.01):
         self.seuil = seuil
         self.learning_rate = learning_rate
-        self.poids = np.zeros(nb_inputs + 1) #poids du biais
+        self.poids = np.zeros(nb_inputs + 1) # poids est le biais / on crée une colonne de zéros (derniere colonne) pour initialiser les biais
 
     def predict(self, inputs):
-        somme = np.dot(self.poids[0:11],inputs.T) + self.poids[-1] #f(x) =1 si poids.inputs + biais > 0
-                                              # il faut que inputs et weights aient les mêmes dimensions (produit scalaire)
+        somme = np.dot(self.poids[0:11],inputs.T) + self.poids[-1] #f(x) =1 si poids.inputs + biais > 0 sinon 0
+                                        
         if somme > 0:  
 
             activation = 1   # vin de qualité, le label(résultat véridique) est de 1
@@ -51,59 +57,45 @@ class Perceptron(object):
 
     def train(self, training_inputs, labels):
 
-        for lim in range(self.seuil): 
-            """labels numpy tableau output vauluesfor toutes les valeurs correspondantes a training inputs"""
-            for inputs, label in zip(training_inputs, labels): 
-                """training inputs mm taille que labels // labels - > label et training input ->  input"""
-                prediction = self.predict(inputs)
-                self.poids[0:11] += self.learning_rate * (label - prediction) * (inputs)
-                """label - prediction error"""
-                self.poids[-1] += self.learning_rate * (label - prediction)
-                """biais->"""
+        for lim in range(self.seuil): # déclaration de la boucle qui permettra de faire 'seuils' fois l'entrainement
+         
+            for inputs, label in zip(training_inputs, labels): #inputs et label prennent respectivement les valeurs training_inputs et labels
+   
+                prediction = self.predict(inputs)   # on prédit le résultat pour chaque ligne
+                self.poids[0:11] += self.learning_rate * (label - prediction) * (inputs)  # ajustement du coefficient directeur de l'hyperplan
+
+                self.poids[-1] += self.learning_rate * (label - prediction) # ajustement du biais ( ordonnée à l'origine)
+
                 
-    def score_perceptron(self, test_data, resultat):
+    def perceptron_accurancy(self, data, label):
 
-        i = 0.0             # initializing to float to avoid caclculus issues with euclidian division
-        nb_error = 0.0
-        i = test_data.shape[0]      # takes the number of row in the testing_data
+        nb_test = 0.0            # les deux variables sont initialisées de cette manière pour éviter les conflits de type
+        erreur = 0.0
+        nb_test = data.shape[0]      #data.shape[0] récupère le nombre de ligne du data_test
 
-        for row, res in zip(test_data, resultat):
-            
+        for row, resultat in zip(data, label):
             prediction = self.predict(row)
 
-            if prediction != res:   # if the predicted class is different than the actual class,
-                nb_error += 1  # increments nb_error
-                
-        return 1 - (nb_error/i)
-    
-    
-    
+            if prediction != resultat:   # si la prédiction est différente du résultat, alors on incrémente l'erreur
+                erreur += 1  # increments nb_error
+        
+        return (1 - erreur/nb_test) 
 
-def integ():
+      
+
+def start():
     data = pd.read_csv("red_wines.csv")
-    #data = clean(data)
+    data = clean(data)
     return data
 
-    
-def mauvais(data):
-    return data[data['quality']==-1]
-
-def bon(data):
-    return data[data['quality']==1]
-
-   
-def median(data_m,data_b):
-    
-    data_mauvais = data_m.median(skipna = True)
-    data_bon = data_b.median(skipna = True)
-    
-    frames = [data_mauvais,data_bon]
-    
-    return pd.concat(frames,axis = 1, sort = False)
 """
-def pH(data):    
-    
-     return data[(data['pH']<=3.5) & (data['pH']>=3)]
+Les 11 fonctions ci-dessous permettent d'épurer les valeurs de telles manière à ce que l'on enlève les valeurs
+qui sont 3x supérieures ou inférieures à la moyenne ou la médiane.
+
+Pour choisir entre la moyenne et la médiane, nous avons établi quel attribut avait une allure gausienne ( et donc nous 
+appliquons la moyenne) et quel attribut ne l'avait pas ( et donc la médiane cette fois-ci) 
+
+
 """
 
 def fixed_acidity(data):
@@ -163,6 +155,7 @@ def alcohol(data):
     
     
 def clean(data):
+    
     data.dropna()
     data = fixed_acidity(data)
     data = volatile_acidity(data)
@@ -175,11 +168,12 @@ def clean(data):
     data = pH(data)
     data = sulphates(data)
     data = alcohol(data)
-    
+
+
     return data
 
 
-def test(data):
+def test(data):       # récupération de 10% des valeurs ( une toute les 10 lignes) ce qui fera les données de test                                   
     echantillon = pd.DataFrame(columns=['fixed acidity',
                                         'volatile acidity',
                                         'citric acid',
@@ -201,7 +195,7 @@ def test(data):
         compteur1 += 1
     return echantillon
 
-def entrainement(data):
+def entrainement(data):     # récupération de 90% des valeurs ( une toute les 10 lignes) ce qui fera les données de test  
     echantillon = pd.DataFrame(columns=['fixed acidity',
                                         'volatile acidity',
                                         'citric acid',
@@ -222,49 +216,3 @@ def entrainement(data):
             compteur2 += 1
         compteur1 += 1
     return echantillon
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    """
-            
-              data_mauvais = data_m.median(skipna = True)
-    data_bon = data_b.median(skipna = True)
-    
-    frames = [data_mauvais,data_bon]
-    
-    return pd.concat(frames,axis = 1, sort = False)
-    """     
-            
-    
-
-    
